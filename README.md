@@ -9,3 +9,5 @@ Then you can add either a downloaded image or take a screenshot directly that wi
 
 Suggestions are welcome!
 Also please report any bugs.
+
+Created by LGoldmund
