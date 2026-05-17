@@ -1,4 +1,4 @@
-This is my first tkinter project, bare with me.
+[This is my first tkinter project, bare with me.]
 
 Ever thought "who is this again?" when watching any show? 
 This small macOS desktop app answers this question!
