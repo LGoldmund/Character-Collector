@@ -1,12 +1,7 @@
-"""
-GUI porject nr. 1: Character Collector (created 11/05/2026)
-"""
-
 import os
 import tkinter as tk
 import subprocess
 import time
-from PIL import ImageGrab
 from tkinter import messagebox, simpledialog, filedialog
 from manager import SeriesManager, Character
 from PIL import Image, ImageTk
@@ -16,7 +11,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Character Collector")
-        self.root.geometry("726x750")
+        self.root.geometry("726x800")
         self.root.resizable(False, True)
 
         try:
@@ -52,12 +47,13 @@ class App:
             selectforeground="#1E1E1E",
             borderwidth=0,
             highlightthickness=0,
-            font=("Arial", 14),
+            font=("Arial", 16),
             activestyle="none"
         )
         self.series_listbox.pack(padx=(24, 0), fill="both", expand=True)
         self.series_listbox.bind('<<ListboxSelect>>', self.on_series_select)
         self.series_listbox.bind("<Button-2>", self.show_series_context_menu)
+        self.series_listbox.bind("<Button-3>", self.show_series_context_menu)
 
         tk.Button(
             self.left_frame,
@@ -92,13 +88,6 @@ class App:
         confirm = messagebox.askyesno("Delete Series",
                                       f"Are you sure you want to delete {series_name}? This action cannot be undone.")
         if confirm:
-            chars = self.manager.get_character_for_series(series_name)
-            for char in chars:
-                img_path = char.get("image_path")
-                if os.path.exists(img_path) and "assets" in img_path:
-                    try: os.remove(img_path)
-                    except: pass
-
             self.manager.delete_series(series_name)
             self.current_series = None
             self.refresh_sidebar()
@@ -143,15 +132,12 @@ class App:
         self.canvas.pack(side="top", fill="both", expand=True, padx=24)
 
         self.card_container = tk.Frame(self.canvas, bg="#1E1E1E")
-
         self.canvas_window = self.canvas.create_window((0, 0), window=self.card_container, anchor="nw")
-
         self.card_container.bind(
             "<Configure>",
             lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
         )
         self.canvas.bind("<Configure>", lambda e: self.canvas.itemconfig(self.canvas_window, width=e.width))
-
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
 
 
@@ -171,6 +157,9 @@ class App:
     def refresh_character_list(self):
         for widget in self.card_container.winfo_children():
             widget.destroy()
+
+        self.canvas.yview_moveto(0)
+        self.canvas.configure(scrollregion=(0, 0, 0, 0))
 
         if not self.current_series:
             return
@@ -223,30 +212,33 @@ class App:
 
 
     def capture_screenshot_to_assets(self, popup_window):
+        if popup_window and popup_window.winfo_exists():
+            popup_window.transient(self.root)
+
         self.root.withdraw()
         time.sleep(0.25)
 
         try:
-            subprocess.run(["screencapture", "-i", "-c"])
+            filename = f"snip_{int(time.time())}.png"
+            local_path = os.path.join(self.manager.image_folder, filename)
+            subprocess.run(["screencapture", "-i", local_path])
             self.root.deiconify()
 
             if popup_window and popup_window.winfo_exists():
                 popup_window.lift()
                 popup_window.focus_force()
+                popup_window.grab_set()
+                popup_window.grab_release()
 
-            img = ImageGrab.grabclipboard()
-
-            if img:
-                filename = f"snip_{int(time.time())}.png"
-                local_path = os.path.join(self.manager.image_folder, filename)
-                img.save(local_path, "PNG")
+            if os.path.exists(local_path) and os.path.getsize(local_path) > 0:
                 return local_path
             return None
 
         except Exception as e:
-            self.root.deinconify()
+            self.root.deiconify()
             if popup_window and popup_window.winfo_exists():
                 popup_window.lift()
+                popup_window.focus_force()
             print(f"Screenshot feature failed: {e}")
             return None
 
@@ -262,8 +254,10 @@ class App:
             char_menu.post(event.x_root, event.y_root)
 
         card.bind("<Button-2>", show_menu)
+        card.bind("<Button-3>", show_menu)
         for child in card.winfo_children():
             child.bind("<Button-2>", show_menu)
+            child.bind("<Button-3>", show_menu)
 
         img_path = char_data.get('image', '')
 
@@ -361,6 +355,9 @@ class App:
             title = title_entry.get()
             path = image_path_var.get()
 
+            if path.startswith("Upload an image"):
+                path = ""
+
             if name and self.current_series:
                 new_char = Character(name, group, title, path)
                 self.manager.add_character(self.current_series, new_char)
@@ -378,13 +375,6 @@ class App:
         confirm = messagebox.askyesno("Delete Character",
                                       f"Are you sure you want to delete {char_data['name']}? This cannot be undone.")
         if confirm:
-            img_path = char_data.get('image', '')
-            if os.path.exists(img_path) and "default" not in img_path:
-                try:
-                    os.remove(img_path)
-                except Exception as e:
-                    print(f"Error deleting image: {e}")
-
             self.manager.delete_character(self.current_series, char_data['name'])
             self.refresh_character_list()
 
